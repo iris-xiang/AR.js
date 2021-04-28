@@ -2,9 +2,9 @@
 <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
 <!-- three.js library -->
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <script src='../examples/vendor/three.js/build/three.min.js'></script>
 <script src="../examples/vendor/three.js/examples/js/libs/stats.min.js"></script>
-<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
 <!-- ar.js -->
 <script src="../build/ar.js"></script>
 <script>THREEx.ArToolkitContext.baseURL = '../'</script>
@@ -30,7 +30,7 @@ var markerHiro;
 
 var angle = 0;
 var isRed = true,isActive = false;
-var markerRoot;
+var markerRoot,group;
 
 $('#toggle').click ( //轉盤的結果(指針指向的顏色)以<p>字串呈現
 	toggle
@@ -118,17 +118,22 @@ function init() {
 
 	cameraHUD = new THREE.OrthographicCamera(-hW,hW,hH,-hH,-10,100);
 	
-	button = new Button(0,-hH / 2, hH / 3);
-	sceneHUD.add(button.mesh);
+	let loader = new THREE.TextureLoader();
+	loader.setCrossOrigin(''); //
+	loader.load(
+    	// resource URL
+    	'https://i.imgur.com/r2bHPXw.png',
 
-	// 按鈕event
+    	// Function when resource is loaded
+    	function(texture) {
+      		console.log ('texture loaded ...')
+			var buttonSize = hH/3; // radius
+			button = new Button (hW/2, -hH/2, buttonSize, 'white', texture); 
+			sceneHUD.add (button.mesh);
+    	},
 
-	/*if(!!navigator.platform.match(/iPhone|iPod|iPad/)){
-		document.addEventListener("touchstart", onTouchDown, false);
-	}
-	else {
-		document.addEventListener('mousedown', onMouseDown);
-	}*/
+  	);
+
 	
 	var _iOSDevice = !!navigator.platform.match(/iPhone|iPod|iPad/);
 
@@ -136,21 +141,22 @@ function init() {
 		$('#iOSdevice').text ('use iPhone/iPad')
 
 		// for those with touch screen
-    	document.addEventListener('touchstart', onTouchDown, false);
-    	document.addEventListener('touchmove', onTouchDown, false);  // same callback
+    	document.addEventListener('touchstart', onTouchStart, false);
+    	document.addEventListener('touchend', onTouchEnd, false);  // same callback
     } else {
     	$('#iOSdevice').text ('regular')
-
-		// mousemove
-		document.addEventListener( 'mousemove', onMouseDown, false );
+		document.addEventListener( 'mousedown', onMouseDown, false );
+		document.addEventListener( 'mouseup', onMouseUp, false );
     }
 
 }
 	
 function addMarkerHiro(){
 	
+	group = new THREE.Group();
 	markerRoot = new THREE.Group()
-
+	scene.add (group);  
+	
 	var artoolkitMarker = new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
 		type : 'pattern',
 		patternUrl : THREEx.ArToolkitContext.baseURL + '/data/data/patt.hiro'
@@ -161,33 +167,36 @@ function addMarkerHiro(){
 	let circle = new THREE.Object3D();
 	
 	let geometry0 = new THREE.CircleGeometry( 2, 32, Math.PI/2, 2*Math.PI/3);
-	let material0 = new THREE.MeshBasicMaterial( { color: 0xffff00, side: THREE.DoubleSide} );
+	let material0 = new THREE.MeshBasicMaterial( { color: 0xff0000, side: THREE.DoubleSide} );
 	let circle0 = new THREE.Mesh( geometry0, material0 );	
 	circle.add( circle0 );  
 
-	let geometry1 = new THREE.CircleGeometry( 2, 32, Math.PI/2 + 2/3*Math.PI, 2*Math.PI/3);
-	let material1 = new THREE.MeshBasicMaterial( { color: 0xff0000 , side: THREE.DoubleSide} );
+	let geometry1 = new THREE.CircleGeometry( 2, 32, Math.PI/2 + 2*Math.PI/3, 2*Math.PI/3);
+	let material1 = new THREE.MeshBasicMaterial( { color: 0x00ff00 , side: THREE.DoubleSide} );
 	let circle1 = new THREE.Mesh( geometry1, material1 );
 	circle.add( circle1 );  
    
-	let geometry2 = new THREE.CircleGeometry( 2, 32, Math.PI/2 - 2/3*Math.PI, 2*Math.PI/3);
-	let material2 = new THREE.MeshBasicMaterial( { color: 0x00ffff, side: THREE.DoubleSide } );
+	let geometry2 = new THREE.CircleGeometry( 2, 32, Math.PI/2 - 2*Math.PI/3, 2*Math.PI/3);
+	let material2 = new THREE.MeshBasicMaterial( { color: 0x0000ff, side: THREE.DoubleSide } );
 	let circle2 = new THREE.Mesh( geometry2, material2 );
 	circle.add( circle2 );
 	
-	let geometry = new THREE.BoxGeometry(0.1,0.1,0.9);
-	let material = new THREE.MeshNormalMaterial();
-	let box = new THREE.Mesh( geometry, material );
-	box.position.z = -2;
-
-	
-	var grid = new THREE.GridHelper (10,10,'red','white');
-	
 	circle.rotation.x = -Math.PI / 2;
-	markerRoot.add(circle,box);
-	markerRoot.add(grid);
+	
+	let geometry = new THREE.ConeGeometry( 0.4, 1, 2 );
+	let material = new THREE.MeshPhongMaterial({color:"#D3D3D3"});
+	let pointer = new THREE.Mesh( geometry, material );
+	group.add(pointer);
+	
+	group.rotation.x = -Math.PI/2;
+	
+	let light = new THREE.PointLight( 0xffffff, 1,1000);
+	light.position.set(2.52,10,0);
+	group.add(light);
 
 	
+	markerRoot.add(circle,group);
+
 	return markerRoot;
 }	
 
@@ -196,7 +205,9 @@ function animate() {
 	stats.update();
 	
 	if( arToolkitSource.ready === false )	return
-	arToolkitContext.update( arToolkitSource.domElement )
+	arToolkitContext.update( arToolkitSource.domElement );
+	
+	button.mesh.material.visible = markerRoot.visible;
 	
 	//圓盤轉動
 	if(isActive){
@@ -207,7 +218,7 @@ function animate() {
 		else 
 			nowRotateSpeed = Math.max(nowRotateSpeed - 0.001, 0.0);
 
-		markerHiro.children[0].rotation.z = angle;
+		markerHiro.children[1].rotation.z = angle;
 	}
 
 	if(isActive && nowRotateSpeed === 0.0){
@@ -220,7 +231,7 @@ function animate() {
 	renderer.render (sceneHUD, cameraHUD);
 }
 
-function onTouchDown(event){
+function onTouchStart(event){
 	if(event.touches.length == 1){
 		event.preventDefault();
 		let x = ( event.touches[0].pageX / window.innerWidth ) * 2 - 1;
@@ -229,6 +240,11 @@ function onTouchDown(event){
 		pickCompute(x,y);
 	}
 }
+function onTouchEnd (event) {
+	event.preventDefault();
+	speedUpFlag = false;
+}
+
 function onMouseDown(event){
 	event.preventDefault();
 	let x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -236,13 +252,17 @@ function onMouseDown(event){
 
 	pickCompute(x,y);
 }
+function onMouseUp(event){
+	event.preventDefault();
+	speedUpFlag = false;
+}
 
 function pickCompute(x, y){
 	let HUD_coord = [hW * x, hH * y];
 	let dist = button.d2To(HUD_coord);
 	let printStr = [dist.toFixed(2), HUD_coord[0].toFixed(2), HUD_coord[1].toFixed(2)];
 
-	if(dist < button.size){
+	if(dist <= button.size){
 		toggle();
 	}
 	else {
@@ -253,15 +273,15 @@ function pickCompute(x, y){
 function judge(){
 	angle %= Math.PI * 2;
 	if(angle > 0 && angle <= Math.PI * 2 / 3){
-		$('#text').css ('color', 'blue');
-		$('#text').text('blue');
-	} else if(angle > Math.PI * 2 / 3 && angle <= Math.PI * 4 / 3){
 		$('#text').css ('color', 'red');
 		$('#text').text('red');
+	} else if(angle > -Math.PI * 2 / 3 && angle <= Math.PI * 4 / 3){
+		$('#text').css ('color', 'green');
+		$('#text').text('green');
 	}
 	else {
-		$('#text').css ('color', 'yellow');
-		$('#text').text('yellow');
+		$('#text').css ('color', 'blue');
+		$('#text').text('blue');
 	}
 	isActive = false;
 }
